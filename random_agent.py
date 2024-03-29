@@ -1,4 +1,3 @@
-import random
 from blackjack_agent import BlackjackAgent
 
 class RandomAgent(BlackjackAgent):
