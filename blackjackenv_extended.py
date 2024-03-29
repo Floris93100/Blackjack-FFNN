@@ -144,6 +144,7 @@ class BlackjackEnv(gym.Env):
                     # Switch to second hand if first hand done
                     self.active_hand = 2
                     terminated = False
+                    observation = self._get_obs()
                 
                 return observation, reward, terminated, False, {}
             elif self.active_hand == 2:
@@ -160,25 +161,30 @@ class BlackjackEnv(gym.Env):
             
             if is_bust(hand):
                 terminated = True
-                reward = -1.0
+                reward = -1.0 + self.reward_first_hand
             else:
                 terminated = False
                 reward = 0.0
             self.can_double_down = False
+
+            if self.active_hand == 1:
+                self.reward_first_hand = reward
         
-        elif action == 0:  # stick: play out the dealers hand, and score
+        elif action == 0:  # stand: play out the dealers hand, and score
             terminated = True
             reward = 0.0 # klopt dit?
             
             if self.active_hand == 2 or not self.splitted:
                 while sum_hand(self.dealer) < 17:
                     self.dealer.append(draw_card(self.np_random))
-                reward = cmp(score(self.player), score(self.dealer))
-                
-
-            if self.splitted:
-                # Double reward for splitted hands
-                reward *= 2
+                reward = cmp(score(hand), score(self.dealer))
+            
+            # compare first hand to dealer
+            if self.splitted and self.active_hand == 2:
+                if self.reward_first_hand == 0.0:
+                    self.reward_first_hand = cmp(score(self.player), score(self.dealer))
+            
+                reward+= self.reward_first_hand
             
             # Natural blackjack only pays if no splitted hands
             elif self.sab and is_natural(hand) and not is_natural(self.dealer):
@@ -190,8 +196,9 @@ class BlackjackEnv(gym.Env):
                 and is_natural(hand)
                 and reward == 1.0
             ):
-                # Natural gives extra points, but doesn't autowin. Legacy implementation
+                # Natural blackjack pays 1.5
                 reward = 1.5
+            
                 
         elif action == 2: #double down: player gets one more card, game ends immediately with double reward
             # double down after splitting not allowed
@@ -255,5 +262,6 @@ class BlackjackEnv(gym.Env):
         self.can_double_down = True
         self.splitted = False
         self.active_hand = 1
+        self.reward_first_hand = 0.0
 
         return self._get_obs(), {}
