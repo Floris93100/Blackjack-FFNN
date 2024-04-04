@@ -1,8 +1,8 @@
 from blackjack_agent import BlackjackAgent
 
 class BasicStrategyAgent(BlackjackAgent):
-    def __init__(self, env):
-        super().__init__(env)
+    def __init__(self, env, filename=None):
+        super().__init__(env, filename)
         
     def minimum_standing_number(self, D, usable_ace):
         # Draw card if player sum is less than minimum standing number
@@ -18,15 +18,16 @@ class BasicStrategyAgent(BlackjackAgent):
                 return 12
             elif D >= 7 or D == 1:
                 return 17
-        
+    
+    def get_action(self, observation):
+        return self.action_selector(observation)    
         
     def action_selector(self, observation):
         player_sum = observation[0]
         dealer_card = observation[1]
         usable_ace = observation[2]
         double_down_allowed = observation[3]
-        splitted = observation[4]
-        can_split = observation[5]
+        can_split = observation[4]
         
         # Strategy implemented according to Baldwin et al. (1956)
         
@@ -48,7 +49,7 @@ class BasicStrategyAgent(BlackjackAgent):
                 or (player_sum == 9 and dealer_card >= 2 and dealer_card <= 6)):
                     action = 2
         
-        if not splitted and can_split:
+        if can_split:
             if (player_sum == 16
             or player_sum == 12
             or (player_sum == 18 and dealer_card in [2,3,4,5,6,8,9])

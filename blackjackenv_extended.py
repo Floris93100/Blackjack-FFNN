@@ -238,18 +238,16 @@ class BlackjackEnv(gym.Env):
         if self.active_hand == 1 or not self.splitted:
             return (sum_hand(self.player), 
                     self.dealer[0], 
-                    usable_ace(self.player), 
-                    self.can_double_down, 
-                    self.splitted,
-                    can_split(self.player))
+                    int(usable_ace(self.player)), 
+                    int(self.can_double_down), 
+                    int(not self.splitted and can_split(self.player)))
         # second hand
         else:
             return (sum_hand(self.player2), 
                     self.dealer[0], 
-                    usable_ace(self.player2), 
-                    self.can_double_down, 
-                    self.splitted,
-                    False)
+                    int(usable_ace(self.player2)), 
+                    int(self.can_double_down),
+                    0)
     def reset(
         self,
         seed: Optional[int] = None,
