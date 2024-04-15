@@ -4,7 +4,7 @@ class BlackjackAgent():
     # Blackjack agent class, agents can implement action_selector depending on the strategy
     def __init__(self, env, filename=None):
         self.action_space = env.action_space
-        self.filename = f"data/{filename}.csv"
+        self.filename = f"../data/{filename}.csv"
         
         self.data = []
     
