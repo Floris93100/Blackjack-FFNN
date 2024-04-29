@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch
 
 class BackpropNN(nn.Module):
     
@@ -19,3 +20,10 @@ class BackpropNN(nn.Module):
         
     def forward(self, x):
         return self.model(x)
+    
+    def predict_action(self, x):
+        self.model.eval()
+        
+        with torch.no_grad():
+            predictions = self.model(x)
+            return predictions.argmax().item()
