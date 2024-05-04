@@ -14,6 +14,7 @@ class FFNN(nn.Module):
         epochs=60, 
         batch_size=32,
         activation_fn = nn.ReLU(),
+        lr_decay=False,
         labels=4
     ):
         super().__init__()
@@ -33,6 +34,7 @@ class FFNN(nn.Module):
                     epochs, 
                     learning_rate, 
                     activation_fn,
+                    lr_decay,
                     device
                 )
             )   
@@ -42,7 +44,7 @@ class FFNN(nn.Module):
         y_one_hot = torch.eye(n)[y]
         return torch.concat((x, y_one_hot), 1)       
 
-    def predict_accumulated_goodness(self, u):
+    def predict_accumulated_goodness(self, u, return_goodness=False):
         goodness_per_action = []
         for label in range(self.labels):
             x_test = self.combine_input_and_label(u, torch.full((u.size(0),),label), self.labels)
@@ -53,23 +55,34 @@ class FFNN(nn.Module):
                     accumulated_goodness += layer.calculate_goodness(x_test)
             goodness_per_action.append(accumulated_goodness)
         predicted_label = torch.argmax(torch.stack(goodness_per_action), dim=0, keepdim=True)
+        
+        if return_goodness:
+            return goodness_per_action
+        
         return predicted_label
         
     def train(self, u_pos, u_neg):
         x_pos, x_neg = u_pos.to(self.device), u_neg.to(self.device)
         for layer in self.model:
-            #print(f'Training Layer: {self.model.index(layer) + 1}')
+            #print(f'\nTraining Layer: {self.model.index(layer) + 1}')
+            #print("-"*40)
             x_pos, x_neg = layer.train(x_pos.to(self.device), x_neg.to(self.device), self.batch_size)
               
-    def save_model(self, path):
+    def save_model(self, path='../models/model.pth', save=True):
         state = {
             'model_state': [layer.state_dict() for layer in self.model],
             'optimizer_state': [layer.optimizer.state_dict() for layer in self.model],
         }
-        torch.save(state, path)
+        if save:    
+            torch.save(state, path)
+        else:
+            return state
         
-    def load_model(self, path):
-        state = torch.load(path)
+    def load_model(self, path='../models/model.pth', from_file=True, state=None):
+        if from_file:
+            state = torch.load(path)
+        else:
+            state = state
         for layer, layer_state, optimizer_state in zip(self.model, state['model_state'], state['optimizer_state']):
             layer.load_state_dict(layer_state)
             layer.optimizer.load_state_dict(optimizer_state)
@@ -86,15 +99,29 @@ class FFLayer(nn.Linear):
         epochs, 
         learning_rate,
         activation_fn,
+        lr_decay,
         device
     ):
         super().__init__(in_features, out_features, bias)
         
         self.activation_fn = activation_fn # vervangen door eigen versie?
         self.optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
-        self.epochs = epochs
         self.threshold = threshold
+        self.epochs = epochs
+        self.learning_rate = learning_rate
+        self.lr_decay = lr_decay
         self.to(device)
+        
+    def get_learning_rate(self, current_epoch):
+        # lr(e) = 2LR/E * (1 + E - e)
+        if self.lr_decay:
+            if current_epoch > self.epochs/2:
+                lr = (2 * self.learning_rate) / self.epochs * (1 + self.epochs - current_epoch)
+            else:
+                lr = self.learning_rate
+            return lr
+        else:
+            return self.learning_rate
         
     def layer_normalization(self, x):
         # x_i = x_i / (sqrt(sum(x_i^2)))
@@ -105,10 +132,6 @@ class FFLayer(nn.Linear):
         x_norm = self.layer_normalization(x)
         # z = Wx + b
         z = super().forward(x_norm)
-        
-        # print(torch.mm(x_norm, self.weight.T) +
-        #     self.bias.unsqueeze(0)) waarom niet dit? addmmbackward0 vs addbackward0
-        
         # a = f(z)
         return self.activation_fn(z)
     
@@ -124,6 +147,11 @@ class FFLayer(nn.Linear):
         
         for epoch in range(self.epochs):
             epoch_loss = 0
+            
+            if self.lr_decay:
+                lr = self.get_learning_rate(epoch + 1)
+                self.optimizer.param_groups[0]['lr'] = lr
+
             for batch in range(num_batches):
                 start_idx = batch * batch_size
                 end_idx = start_idx + batch_size
@@ -138,7 +166,7 @@ class FFLayer(nn.Linear):
                 
                 loss_pos = torch.log(1 + torch.exp(-(g_pos - self.threshold)))
                 loss_neg = torch.log(1 + torch.exp(g_neg - self.threshold))
-                loss = (loss_pos + loss_neg).sum() # sum of mean reduction?
+                loss = (loss_pos + loss_neg).sum()
                 epoch_loss += loss.item()
                 
                 self.optimizer.zero_grad()
@@ -147,8 +175,8 @@ class FFLayer(nn.Linear):
                 self.optimizer.step()
                 
                 total_loss += loss.item()
-            #print(f'Avg Loss last epoch: {epoch_loss / x_pos.size(0)}')
+            #print(f'epoch:{epoch+1}, avg loss: {epoch_loss / x_pos.size(0)}, lr: {self.get_learning_rate(epoch + 1)}')
             
-        return self.forward(x_pos).detach(), self.forward(x_neg).detach() # .detach()?
+        return self.forward(x_pos).detach(), self.forward(x_neg).detach() 
         
         

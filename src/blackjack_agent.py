@@ -38,5 +38,8 @@ class BlackjackAgent():
             writer.writerow(["Player sum", "Dealer card", "Usable ace", "Double down allowed", "Split allowed", "Action"])
             writer.writerows(self.data)
     
-    def learn(self, state, action, reward, next_state):
+    def learn(self, state, action, reward, next_state, done):
+        pass
+    
+    def decay_epsilon(self):
         pass
