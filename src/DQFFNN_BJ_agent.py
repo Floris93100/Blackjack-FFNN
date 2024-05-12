@@ -1,10 +1,11 @@
+from blackjack_agent import BlackjackAgent
 from FFNN import FFNN
 import torch
 import numpy as np
 import random
 from collections import deque
 
-class DQFFNNAgent():
+class DQFFNNAgentBJ(BlackjackAgent):
     def __init__(
         self, 
         env,
@@ -18,7 +19,9 @@ class DQFFNNAgent():
         batch_size=1,
         update_td_target=1000,
         buffer_size=100000,
+        filename=None
         ):
+        super().__init__(env, filename)
         
         self.model = FFNN(
             device,
@@ -26,8 +29,7 @@ class DQFFNNAgent():
             threshold=threshold,
             learning_rate=lr,
             epochs=1,
-            batch_size=batch_size,
-            labels=env.action_space.n
+            batch_size=batch_size
         )
         self.td_target = FFNN(
             device,
@@ -35,12 +37,10 @@ class DQFFNNAgent():
             threshold=threshold,
             learning_rate=lr,
             epochs=1,
-            batch_size=batch_size,
-            labels=env.action_space.n
+            batch_size=batch_size
         )
         self.td_target.load_model(from_file=False, state=self.model.save_model(save=False))
         
-        self.env = env
         self.threshold = threshold
         self.epsilon = epsilon
         self.epsilon_decay = epsilon_decay
@@ -132,10 +132,10 @@ class DQFFNNAgent():
         self.epsilon = max(0.01, self.epsilon - self.epsilon_decay)
         #print(f'epsilon: {self.epsilon}')
     
-    def get_action(self, observation):
+    def action_selector(self, observation):
         # epsilon greedy action selection
         if np.random.random() < self.epsilon:
-            return self.env.action_space.sample()
+            return self.action_space.sample()
         else:
             return self.model.predict_accumulated_goodness(self.obs_to_tensor([observation])).item()
             
