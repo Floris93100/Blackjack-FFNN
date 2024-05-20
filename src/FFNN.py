@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
+from linear_classifier import LinearClassifier
+
 class FFNN(nn.Module):
     
     def __init__(
@@ -15,7 +17,8 @@ class FFNN(nn.Module):
         batch_size=32,
         activation_fn = nn.ReLU(),
         lr_decay=False,
-        labels=4
+        labels=4,
+        classifier=False 
     ):
         super().__init__()
         
@@ -39,6 +42,10 @@ class FFNN(nn.Module):
                 )
             )   
         self.to(self.device)
+        
+        if classifier:
+            self.classifier = LinearClassifier(sum(layers[2:]),labels, learning_rate)
+            
             
     def combine_input_and_label(self, x, y, n):
         y_one_hot = torch.eye(n)[y]
@@ -60,6 +67,9 @@ class FFNN(nn.Module):
             return goodness_per_action
         
         return predicted_label
+    
+    def predict_classifier(self, u):
+        pass
         
     def train(self, u_pos, u_neg):
         x_pos, x_neg = u_pos.to(self.device), u_neg.to(self.device)
@@ -87,6 +97,33 @@ class FFNN(nn.Module):
             layer.load_state_dict(layer_state)
             layer.optimizer.load_state_dict(optimizer_state)
 
+    def train_classifier(self, x, y, epochs):
+        # Forward pass FFNN
+        input = torch.empty(0).to(self.device)
+        for layer in self.model:
+            x = layer.forward(x)
+            # Collect normalized activities of all hidden layers except first
+            if layer != self.model[0]:
+                x_norm = layer.layer_normalization(x)
+                input = torch.cat((input, x_norm), 1)
+        
+        # Train Softmax classifier
+        self.classifier.train()
+        
+        print("\nTraining Softmax")
+        print("-"*40)
+        for epoch in tqdm(range(epochs)):
+            predictions = self.classifier(input)
+            loss = self.classifier.loss(predictions, y)
+            
+            self.classifier.optimizer.zero_grad()
+            loss.backward(retain_graph=True)
+            self.classifier.optimizer.step()
+            
+            
+        print(f"Last epoch loss: {loss.item()/x.size(0)}")
+            
+        return
 
 class FFLayer(nn.Linear):
     
@@ -138,14 +175,13 @@ class FFLayer(nn.Linear):
     
     def calculate_goodness(self, x):
         # goodness = sum of squared activations
-        # print(x.pow(2).mean(1))
         return torch.sum(x**2, dim=1)
 
     def train(self, x_pos, x_neg, batch_size):
         total_loss = 0
         num_batches = len(x_pos) // batch_size
         
-        for epoch in range(self.epochs):
+        for epoch in tqdm(range(self.epochs)):
             epoch_loss = 0
             
             if self.lr_decay:

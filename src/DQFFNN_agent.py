@@ -58,7 +58,7 @@ class DQFFNNAgent():
         return np.random.choice(negative_labels)
     
     def obs_to_tensor(self, observation):
-        return torch.tensor(observation, dtype=torch.float32).to(self.model.device)
+        return torch.tensor(np.array(observation), dtype=torch.float32).to(self.model.device)
     
     def update(self): 
         
@@ -90,7 +90,7 @@ class DQFFNNAgent():
         # positive sample is state with action
         x_pos = self.model.combine_input_and_label(
             self.obs_to_tensor(states), 
-            torch.tensor(actions, dtype=torch.int64).to(self.model.device), 
+            torch.tensor(actions, dtype=torch.int64), 
             self.model.labels
         )
         x_neg = torch.zeros_like(x_pos)
