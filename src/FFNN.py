@@ -71,9 +71,8 @@ class FFNN(nn.Module):
     def predict_classifier(self, u):
         # Combine input with neutral labels
         x = torch.concat((u, torch.full((u.size(0),self.labels), (1/self.labels))), dim=1)
-
         input = self.collect_hidden_layer_activations(x)
-        
+
         self.classifier.eval()
         
         with torch.no_grad():
@@ -116,7 +115,7 @@ class FFNN(nn.Module):
                 x_norm = layer.layer_normalization(u)
                 input = torch.cat((input, x_norm), 1)
         
-        return input
+        return input.clone().detach()
             
     def train_classifier(self, x, y, epochs):
         # Forward pass FFNN
@@ -132,10 +131,10 @@ class FFNN(nn.Module):
             loss = self.classifier.loss(predictions, y)
             
             self.classifier.optimizer.zero_grad()
-            loss.backward(retain_graph=True)
+            loss.backward()
             self.classifier.optimizer.step()
                       
-        print(f"Last epoch loss: {loss.item()/x.size(0)}")
+        print(f"Last epoch loss: {loss.item()}")
             
         return
 
