@@ -69,7 +69,17 @@ class FFNN(nn.Module):
         return predicted_label
     
     def predict_classifier(self, u):
-        pass
+        # Combine input with neutral labels
+        x = torch.concat((u, torch.full((u.size(0),self.labels), (1/self.labels))), dim=1)
+
+        input = self.collect_hidden_layer_activations(x)
+        
+        self.classifier.eval()
+        
+        with torch.no_grad():
+            predictions = self.classifier(input)
+            return torch.argmax(predictions, dim=1)
+
         
     def train(self, u_pos, u_neg):
         x_pos, x_neg = u_pos.to(self.device), u_neg.to(self.device)
@@ -97,15 +107,20 @@ class FFNN(nn.Module):
             layer.load_state_dict(layer_state)
             layer.optimizer.load_state_dict(optimizer_state)
 
-    def train_classifier(self, x, y, epochs):
-        # Forward pass FFNN
+    def collect_hidden_layer_activations(self, u):
         input = torch.empty(0).to(self.device)
         for layer in self.model:
-            x = layer.forward(x)
+            u = layer.forward(u)
             # Collect normalized activities of all hidden layers except first
             if layer != self.model[0]:
-                x_norm = layer.layer_normalization(x)
+                x_norm = layer.layer_normalization(u)
                 input = torch.cat((input, x_norm), 1)
+        
+        return input
+            
+    def train_classifier(self, x, y, epochs):
+        # Forward pass FFNN
+        input = self.collect_hidden_layer_activations(x)
         
         # Train Softmax classifier
         self.classifier.train()
@@ -119,8 +134,7 @@ class FFNN(nn.Module):
             self.classifier.optimizer.zero_grad()
             loss.backward(retain_graph=True)
             self.classifier.optimizer.step()
-            
-            
+                      
         print(f"Last epoch loss: {loss.item()/x.size(0)}")
             
         return
