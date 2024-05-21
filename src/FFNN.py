@@ -44,7 +44,7 @@ class FFNN(nn.Module):
         self.to(self.device)
         
         if classifier:
-            self.classifier = LinearClassifier(sum(layers[2:]),labels, learning_rate)
+            self.classifier = LinearClassifier(sum(layers[2:]),labels, 0.0001)
             
             
     def combine_input_and_label(self, x, y, n):
@@ -85,8 +85,10 @@ class FFNN(nn.Module):
         for layer in self.model:
             #print(f'\nTraining Layer: {self.model.index(layer) + 1}')
             #print("-"*40)
-            x_pos, x_neg = layer.train(x_pos.to(self.device), x_neg.to(self.device), self.batch_size)
-              
+            x_pos, x_neg, losses = layer.train(x_pos.to(self.device), x_neg.to(self.device), self.batch_size)
+        
+        return losses
+          
     def save_model(self, path='../models/model.pth', save=True):
         state = {
             'model_state': [layer.state_dict() for layer in self.model],
@@ -191,7 +193,7 @@ class FFLayer(nn.Linear):
         return torch.sum(x**2, dim=1)
 
     def train(self, x_pos, x_neg, batch_size):
-        total_loss = 0
+        losses = []
         num_batches = len(x_pos) // batch_size
         
         for epoch in tqdm(range(self.epochs)):
@@ -223,9 +225,9 @@ class FFLayer(nn.Linear):
                 loss.backward() 
                 self.optimizer.step()
                 
-                total_loss += loss.item()
+            losses.append(epoch_loss / x_pos.size(0))    
             #print(f'epoch:{epoch+1}, avg loss: {epoch_loss / x_pos.size(0)}, lr: {self.get_learning_rate(epoch + 1)}')
             
-        return self.forward(x_pos).detach(), self.forward(x_neg).detach() 
+        return self.forward(x_pos).detach(), self.forward(x_neg).detach(), losses 
         
         
