@@ -19,7 +19,8 @@ class DQFFNNAgentBJ(BlackjackAgent):
         batch_size=1,
         update_td_target=1000,
         buffer_size=100000,
-        filename=None
+        filename=None,
+        verbose=False
         ):
         super().__init__(env, filename)
         
@@ -29,7 +30,8 @@ class DQFFNNAgentBJ(BlackjackAgent):
             threshold=threshold,
             learning_rate=lr,
             epochs=1,
-            batch_size=batch_size
+            batch_size=batch_size,
+            verbose=verbose
         )
         self.td_target = FFNN(
             device,
@@ -37,7 +39,8 @@ class DQFFNNAgentBJ(BlackjackAgent):
             threshold=threshold,
             learning_rate=lr,
             epochs=1,
-            batch_size=batch_size
+            batch_size=batch_size,
+            verbose=verbose
         )
         self.td_target.load_model(from_file=False, state=self.model.save_model(save=False))
         

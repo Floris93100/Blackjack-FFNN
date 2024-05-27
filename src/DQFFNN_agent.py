@@ -18,6 +18,7 @@ class DQFFNNAgent():
         batch_size=1,
         update_td_target=1000,
         buffer_size=100000,
+        verbose=False
         ):
         
         self.model = FFNN(
@@ -27,7 +28,8 @@ class DQFFNNAgent():
             learning_rate=lr,
             epochs=1,
             batch_size=batch_size,
-            labels=env.action_space.n
+            labels=env.action_space.n,
+            verbose=verbose
         )
         self.td_target = FFNN(
             device,
@@ -36,7 +38,8 @@ class DQFFNNAgent():
             learning_rate=lr,
             epochs=1,
             batch_size=batch_size,
-            labels=env.action_space.n
+            labels=env.action_space.n,
+            verbose=verbose
         )
         self.td_target.load_model(from_file=False, state=self.model.save_model(save=False))
         
@@ -76,7 +79,7 @@ class DQFFNNAgent():
         with torch.no_grad():
             # compute td target
             td_values = self.td_target.predict_accumulated_goodness(next_states, return_goodness=True)
-            max_q = torch.max(torch.stack(td_values), dim=0).values # niet max maar huidige actie goodness?
+            max_q = torch.max(torch.stack(td_values), dim=0).values
             max_q[done] = 0
             td_target = rewards + self.discount_factor * max_q
 

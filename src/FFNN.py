@@ -18,7 +18,8 @@ class FFNN(nn.Module):
         activation_fn = nn.ReLU(),
         lr_decay=False,
         labels=4,
-        classifier=False 
+        classifier=False,
+        verbose=True 
     ):
         super().__init__()
         
@@ -26,6 +27,7 @@ class FFNN(nn.Module):
         self.labels = labels
         self.batch_size = batch_size   
         self.model = []
+        self.verbose = verbose
         
         for i in range(1, len(layers)):
             self.model.append(
@@ -38,13 +40,14 @@ class FFNN(nn.Module):
                     learning_rate, 
                     activation_fn,
                     lr_decay,
-                    device
+                    device,
+                    verbose
                 )
             )   
         self.to(self.device)
         
         if classifier:
-            self.classifier = LinearClassifier(sum(layers[2:]),labels, 0.0001)
+            self.classifier = LinearClassifier(sum(layers[2:]),labels, learning_rate)
             
             
     def combine_input_and_label(self, x, y, n):
@@ -68,9 +71,12 @@ class FFNN(nn.Module):
         
         return predicted_label
     
+    def add_neutral_labels(self, u):
+        return torch.concat((u, torch.full((u.size(0),self.labels), (1/self.labels))), dim=1)
+    
     def predict_classifier(self, u):
         # Combine input with neutral labels
-        x = torch.concat((u, torch.full((u.size(0),self.labels), (1/self.labels))), dim=1)
+        x = self.add_neutral_labels(u)
         input = self.collect_hidden_layer_activations(x)
 
         self.classifier.eval()
@@ -83,8 +89,9 @@ class FFNN(nn.Module):
     def train(self, u_pos, u_neg):
         x_pos, x_neg = u_pos.to(self.device), u_neg.to(self.device)
         for layer in self.model:
-            #print(f'\nTraining Layer: {self.model.index(layer) + 1}')
-            #print("-"*40)
+            if self.verbose:
+                print(f'\nTraining Layer: {self.model.index(layer) + 1}')
+                print("-"*40)
             x_pos, x_neg, losses = layer.train(x_pos.to(self.device), x_neg.to(self.device), self.batch_size)
         
         return losses
@@ -119,26 +126,38 @@ class FFNN(nn.Module):
         
         return input.clone().detach()
             
-    def train_classifier(self, x, y, epochs):
+    def train_classifier(self, u, y, epochs, batch_size):
+        # Add neutral labels to input
+        x = self.add_neutral_labels(u)
+        
         # Forward pass FFNN
         input = self.collect_hidden_layer_activations(x)
         
         # Train Softmax classifier
         self.classifier.train()
+        num_batches = len(x) // batch_size
         
         print("\nTraining Softmax")
         print("-"*40)
         for epoch in tqdm(range(epochs)):
-            predictions = self.classifier(input)
-            loss = self.classifier.loss(predictions, y)
+            losses = []
+            for batch in range(num_batches):
+                start_idx = batch * batch_size
+                end_idx = start_idx + batch_size
+                x_batch = input[start_idx:end_idx]
+                y_batch = y[start_idx:end_idx]
             
-            self.classifier.optimizer.zero_grad()
-            loss.backward()
-            self.classifier.optimizer.step()
+                predictions = self.classifier(x_batch)
+                loss = self.classifier.loss(predictions, y_batch)
+                losses.append(loss.item())
+                
+                self.classifier.optimizer.zero_grad()
+                loss.backward()
+                self.classifier.optimizer.step()
                       
-        print(f"Last epoch loss: {loss.item()}")
+        print(f"Last epoch loss: {sum(losses)/len(losses)}")
             
-        return
+        return losses
 
 class FFLayer(nn.Linear):
     
@@ -152,7 +171,8 @@ class FFLayer(nn.Linear):
         learning_rate,
         activation_fn,
         lr_decay,
-        device
+        device,
+        verbose
     ):
         super().__init__(in_features, out_features, bias)
         
@@ -164,8 +184,10 @@ class FFLayer(nn.Linear):
         self.lr_decay = lr_decay
         self.to(device)
         
+        self.verbose = verbose  
+        
     def get_learning_rate(self, current_epoch):
-        # lr(e) = 2LR/E * (1 + E - e)
+        # lr(e) = 2lr/E * (1 + E - e)
         if self.lr_decay:
             if current_epoch > self.epochs/2:
                 lr = (2 * self.learning_rate) / self.epochs * (1 + self.epochs - current_epoch)
@@ -177,7 +199,7 @@ class FFLayer(nn.Linear):
         
     def layer_normalization(self, x):
         # x_i = x_i / (sqrt(sum(x_i^2)))
-        return x / (torch.sqrt(torch.sum(x**2, dim=1, keepdim=True))+ 1e-08) #  / N erbij?
+        return x / (torch.sqrt(torch.sum(x**2, dim=1, keepdim=True))+ 1e-08)
     
     def forward(self, x):
         # normalize input vector
@@ -196,7 +218,7 @@ class FFLayer(nn.Linear):
         losses = []
         num_batches = len(x_pos) // batch_size
         
-        for epoch in tqdm(range(self.epochs)):
+        for epoch in tqdm(range(self.epochs), disable=not self.verbose):
             epoch_loss = 0
             
             if self.lr_decay:
