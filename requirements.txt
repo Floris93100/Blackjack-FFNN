@@ -2,5 +2,3 @@ gym==0.26.2
 numpy==1.24.4
 torch==2.1.2
 tqdm==4.66.2
-# pandas?
-# scikit?
