@@ -88,9 +88,12 @@ class BlackjackEnv(gym.Env):
     by Sutton and Barto (http://incompleteideas.net/book/the-book-2nd.html).
 
     ### Rewards
+    - win with double down: +2
     - win game: +1
-    - lose game: -1
     - draw game: 0
+    - lose game: -1
+    - lose with double down: +2
+    - split: combination of both hands' rewards
     - win game with natural blackjack:
 
         +1.5 (if <a href="#nat">natural</a> is True)
@@ -172,7 +175,7 @@ class BlackjackEnv(gym.Env):
         
         elif action == 0:  # stand: play out the dealers hand, and score
             terminated = True
-            reward = 0.0 # klopt dit?
+            reward = 0.0 
             
             if self.active_hand == 2 or not self.splitted:
                 while sum_hand(self.dealer) < 17:

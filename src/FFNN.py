@@ -139,6 +139,7 @@ class FFNN(nn.Module):
         
         print("\nTraining Softmax")
         print("-"*40)
+        total_loss = []
         for epoch in tqdm(range(epochs)):
             losses = []
             for batch in range(num_batches):
@@ -154,10 +155,11 @@ class FFNN(nn.Module):
                 self.classifier.optimizer.zero_grad()
                 loss.backward()
                 self.classifier.optimizer.step()
-                      
-        print(f"Last epoch loss: {sum(losses)/len(losses)}")
+            epoch_loss = sum(losses) / len(losses)
+            total_loss.append(epoch_loss)          
+        print(f"Last epoch loss: {epoch_loss}")
             
-        return losses
+        return total_loss
 
 class FFLayer(nn.Linear):
     
