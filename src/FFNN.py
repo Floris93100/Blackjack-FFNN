@@ -51,7 +51,8 @@ class FFNN(nn.Module):
             
             
     def combine_input_and_label(self, x, y, n):
-        y_one_hot = torch.eye(n)[y]
+        y_one_hot = torch.eye(n).to(self.device)
+        y_one_hot = y_one_hot[y]
         return torch.concat((x, y_one_hot), 1)       
 
     def predict_accumulated_goodness(self, u, return_goodness=False):
@@ -72,7 +73,7 @@ class FFNN(nn.Module):
         return predicted_label
     
     def add_neutral_labels(self, u):
-        return torch.concat((u, torch.full((u.size(0),self.labels), (1/self.labels))), dim=1)
+        return torch.concat((u, torch.full((u.size(0),self.labels), (1/self.labels)).to(self.device)), dim=1)
     
     def predict_classifier(self, u):
         # Combine input with neutral labels

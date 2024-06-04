@@ -12,9 +12,7 @@ class FFNNAgent(BlackjackAgent):
             learning_rate=lr,
         )
         self.model.load_model(model_path)
+        self.device = device
         
     def action_selector(self, observation):
-        return self.model.predict_accumulated_goodness(torch.tensor([observation])).item()
-        
-            
-            
+        return self.model.predict_accumulated_goodness(torch.tensor([observation]).to(self.device)).item()
