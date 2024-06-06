@@ -93,9 +93,14 @@ class FFNN(nn.Module):
             if self.verbose:
                 print(f'\nTraining Layer: {self.model.index(layer) + 1}')
                 print("-"*40)
-            x_pos, x_neg, losses = layer.train(x_pos.to(self.device), x_neg.to(self.device), self.batch_size)
+            x_pos, x_neg, accuracy = layer.train(
+                x_pos.to(self.device), 
+                x_neg.to(self.device), 
+                self.batch_size,
+                layer == self.model[-1]
+            )
         
-        return losses
+        return accuracy
           
     def save_model(self, path='../models/model.pth', save=True):
         state = {
@@ -140,9 +145,8 @@ class FFNN(nn.Module):
         
         print("\nTraining Softmax")
         print("-"*40)
-        total_loss = []
+        total_accuracy = []
         for epoch in tqdm(range(epochs)):
-            losses = []
             for batch in range(num_batches):
                 start_idx = batch * batch_size
                 end_idx = start_idx + batch_size
@@ -151,16 +155,15 @@ class FFNN(nn.Module):
             
                 predictions = self.classifier(x_batch)
                 loss = self.classifier.loss(predictions, y_batch)
-                losses.append(loss.item())
                 
                 self.classifier.optimizer.zero_grad()
                 loss.backward()
                 self.classifier.optimizer.step()
-            epoch_loss = sum(losses) / len(losses)
-            total_loss.append(epoch_loss)          
-        print(f"Last epoch loss: {epoch_loss}")
             
-        return total_loss
+            predictions = torch.argmax(self.classifier(input), dim=1)
+            accuracy = predictions.eq(torch.argmax(y, dim=1)).float().mean().item()
+            total_accuracy.append(accuracy)
+        return total_accuracy
 
 class FFLayer(nn.Linear):
     
@@ -217,12 +220,22 @@ class FFLayer(nn.Linear):
         # goodness = sum of squared activations
         return torch.sum(x**2, dim=1)
 
-    def train(self, x_pos, x_neg, batch_size):
-        losses = []
+    def calculate_accuracy(self, x_pos, x_neg):
+        # calculate goodness
+        g_pos = self.calculate_goodness(self.forward(x_pos).detach())
+        g_neg = self.calculate_goodness(self.forward(x_neg).detach())
+        
+        # calculate true positives and true negatives
+        tp = torch.sum(g_pos > self.threshold).item()
+        tn = torch.sum(g_neg < self.threshold).item()
+        
+        return (tp + tn) / (x_pos.size(0) + x_neg.size(0))
+    
+    def train(self, x_pos, x_neg, batch_size, last_layer=False):
+        train_accuracy = []
         num_batches = len(x_pos) // batch_size
         
         for epoch in tqdm(range(self.epochs), disable=not self.verbose):
-            epoch_loss = 0
             
             if self.lr_decay:
                 lr = self.get_learning_rate(epoch + 1)
@@ -243,16 +256,16 @@ class FFLayer(nn.Linear):
                 loss_pos = torch.log(1 + torch.exp(-(g_pos - self.threshold)))
                 loss_neg = torch.log(1 + torch.exp(g_neg - self.threshold))
                 loss = (loss_pos + loss_neg).sum()
-                epoch_loss += loss.item()
                 
                 self.optimizer.zero_grad()
                 # calculate derivative
                 loss.backward() 
                 self.optimizer.step()
-                
-            losses.append(epoch_loss / x_pos.size(0))    
+            
+            if last_layer:
+                train_accuracy.append(self.calculate_accuracy(x_pos, x_neg))   
             #print(f'epoch:{epoch+1}, avg loss: {epoch_loss / x_pos.size(0)}, lr: {self.get_learning_rate(epoch + 1)}')
             
-        return self.forward(x_pos).detach(), self.forward(x_neg).detach(), losses 
+        return self.forward(x_pos).detach(), self.forward(x_neg).detach(), train_accuracy 
         
         
