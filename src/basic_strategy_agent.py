@@ -22,6 +22,7 @@ class BasicStrategyAgent(BlackjackAgent):
     def get_action(self, observation):
         return self.action_selector(observation)    
         
+    # Strategy implemented according to Baldwin et al. (1956)
     def action_selector(self, observation):
         player_sum = observation[0]
         dealer_card = observation[1]
@@ -29,13 +30,13 @@ class BasicStrategyAgent(BlackjackAgent):
         double_down_allowed = observation[3]
         can_split = observation[4]
         
-        # Strategy implemented according to Baldwin et al. (1956)
-        
+        # Compare player sum to minimum standing number to determine initial action
         if player_sum < self.minimum_standing_number(dealer_card, usable_ace):
             action = 1
         else: 
             action = 0
         
+        # Implement double down strategy
         if double_down_allowed:
             if usable_ace:
                 if ((player_sum == 18 and dealer_card in [4,5,6])
@@ -49,6 +50,7 @@ class BasicStrategyAgent(BlackjackAgent):
                 or (player_sum == 9 and dealer_card >= 2 and dealer_card <= 6)):
                     action = 2
         
+        # Implement split strategy
         if can_split:
             if (player_sum == 16
             or player_sum == 12

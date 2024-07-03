@@ -10,7 +10,7 @@ class BlackjackAgent():
     
     def get_action(self, observation):
         
-        #no action required if natural blackjack
+        # No action required if natural blackjack
         if observation[0] == 21:
             return 0
         
@@ -19,7 +19,7 @@ class BlackjackAgent():
         double_down_allowed = observation[3]
         split_allowed = observation[4]
             
-        # hit if double down or split not allowed
+        # Hit if double down or split not allowed
         while (not double_down_allowed and action == 2) or (not split_allowed and action == 3):
             action = 1
 

@@ -21,6 +21,7 @@ class DQFFNNAgent():
         verbose=False
         ):
         
+        # initialize model and target model
         self.model = FFNN(
             device,
             layers=layers,
@@ -53,7 +54,7 @@ class DQFFNNAgent():
         self.batch_size = batch_size
         self.buffer_size = buffer_size
         
-        #experience replay buffer
+        # experience replay buffer
         self.D = []
     
     def generate_neg_label(self, y, n):
@@ -121,6 +122,7 @@ class DQFFNNAgent():
     
     def learn(self, state, action, reward, next_state, done):
         
+        # remove from buffer if full
         if len(self.D) > self.buffer_size:
             deque(self.D).popleft()
         
@@ -133,7 +135,6 @@ class DQFFNNAgent():
     
     def decay_epsilon(self):
         self.epsilon = max(0.01, self.epsilon - self.epsilon_decay)
-        #print(f'epsilon: {self.epsilon}')
     
     def get_action(self, observation):
         # epsilon greedy action selection

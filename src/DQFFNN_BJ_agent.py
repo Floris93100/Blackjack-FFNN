@@ -24,6 +24,7 @@ class DQFFNNAgentBJ(BlackjackAgent):
         ):
         super().__init__(env, filename)
         
+        # initialize model and target model
         self.model = FFNN(
             device,
             layers=layers,
@@ -79,7 +80,7 @@ class DQFFNNAgentBJ(BlackjackAgent):
         with torch.no_grad():
             # compute td target
             td_values = self.td_target.predict_accumulated_goodness(next_states, return_goodness=True)
-            max_q = torch.max(torch.stack(td_values), dim=0).values # niet max maar huidige actie goodness?
+            max_q = torch.max(torch.stack(td_values), dim=0).values
             max_q[done] = 0
             td_target = rewards + self.discount_factor * max_q
 
@@ -121,6 +122,7 @@ class DQFFNNAgentBJ(BlackjackAgent):
     
     def learn(self, state, action, reward, next_state, done):
         
+        # remove from buffer if full
         if len(self.D) > self.buffer_size:
             deque(self.D).popleft()
         
@@ -133,7 +135,6 @@ class DQFFNNAgentBJ(BlackjackAgent):
     
     def decay_epsilon(self):
         self.epsilon = max(0.01, self.epsilon - self.epsilon_decay)
-        #print(f'epsilon: {self.epsilon}')
     
     def action_selector(self, observation):
         # epsilon greedy action selection

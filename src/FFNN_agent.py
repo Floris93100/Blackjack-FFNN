@@ -13,6 +13,7 @@ class FFNNAgent(BlackjackAgent):
         )
         self.model.load_model(model_path)
         self.device = device
-        
+    
+    # predict action based on accumulated goodness method
     def action_selector(self, observation):
         return self.model.predict_accumulated_goodness(torch.tensor([observation]).to(self.device)).item()

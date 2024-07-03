@@ -1,8 +1,4 @@
-import os
 from typing import Optional
-
-import numpy as np
-
 import gym
 from gym import spaces
 from gym.error import DependencyNotInstalled
@@ -51,6 +47,9 @@ def can_split(hand): # Check if the player's hand can be split
 
 class BlackjackEnv(gym.Env):
     """
+    This blackjack environment extends the Blackjack-v1 version from Gymnasium
+    with the split and double down actions.
+    
     Blackjack is a card game where the goal is to beat the dealer by obtaining cards
     that sum to closer to 21 (without going over 21) than the dealers cards.
 
@@ -66,26 +65,30 @@ class BlackjackEnv(gym.Env):
     while the player has two face up cards.
 
     The player can request additional cards (hit, action=1) until they decide to stop (stick, action=0)
-    or exceed 21 (bust, immediate loss).
+    or exceed 21 (bust, immediate loss). A player can also double down on the first hand,
+    or split when receiving a pair. Doubling down after splitting is not allowed.
+    Splitting is only allowed once per game. A game is played as two regular hands
+    after splitting. The dealer's total is compared after both hands have been played.
     After the player sticks, the dealer reveals their facedown card, and draws
     until their sum is 17 or greater.  If the dealer goes bust, the player wins.
     If neither the player nor the dealer busts, the outcome (win, lose, draw) is
-    decided by whose sum is closer to 21.
+    decided by whose sum is closer to 21. 
 
     ### Action Space
     There are four actions: stick (0), and hit (1), double down (2) and split (3).
 
     ### Observation Space
-    The observation consists of a 3-tuple containing: the player's current sum,
+    The observation consists of a 5-tuple containing: the player's current sum,
     the value of the dealer's one showing card (1-10 where 1 is ace),
     whether the player holds a usable ace (0 or 1),
     whether doubling down is allowed (0 or 1),
     whether splitting is allowed (0 or 1)
 
 
-    This environment corresponds to the version of the blackjack problem
+    The original environment corresponds to the version of the blackjack problem
     described in Example 5.1 in Reinforcement Learning: An Introduction
     by Sutton and Barto (http://incompleteideas.net/book/the-book-2nd.html).
+    The extended version is created by F.P.J. de Kam (f.p.j.de.kam@student.rug.nl).
 
     ### Rewards
     - win with double down: +2

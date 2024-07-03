@@ -29,6 +29,7 @@ class FFNN(nn.Module):
         self.model = []
         self.verbose = verbose
         
+        # create model layers
         for i in range(1, len(layers)):
             self.model.append(
                 FFLayer(
@@ -55,6 +56,7 @@ class FFNN(nn.Module):
         y_one_hot = y_one_hot[y]
         return torch.concat((x, y_one_hot), 1)       
 
+    # predictions based on accumulated goodness method
     def predict_accumulated_goodness(self, u, return_goodness=False):
         goodness_per_action = []
         for label in range(self.labels):
@@ -62,6 +64,7 @@ class FFNN(nn.Module):
             accumulated_goodness = 0
             for layer in self.model:
                 x_test = layer.forward(x_test.to(self.device))
+                # collect all hidden layer activations except first
                 if layer != self.model[0]:
                     accumulated_goodness += layer.calculate_goodness(x_test)
             goodness_per_action.append(accumulated_goodness)
@@ -75,6 +78,7 @@ class FFNN(nn.Module):
     def add_neutral_labels(self, u):
         return torch.concat((u, torch.full((u.size(0),self.labels), (1/self.labels)).to(self.device)), dim=1)
     
+    # predictions based on softmax linear classifier method
     def predict_classifier(self, u):
         # Combine input with neutral labels
         x = self.add_neutral_labels(u)
@@ -86,7 +90,7 @@ class FFNN(nn.Module):
             predictions = self.classifier(input)
             return torch.argmax(predictions, dim=1)
 
-        
+    # train FFNN layer by layer    
     def train(self, u_pos, u_neg):
         x_pos, x_neg = u_pos.to(self.device), u_neg.to(self.device)
         for layer in self.model:
@@ -148,14 +152,17 @@ class FFNN(nn.Module):
         total_accuracy = []
         for epoch in tqdm(range(epochs)):
             for batch in range(num_batches):
+                # create batch
                 start_idx = batch * batch_size
                 end_idx = start_idx + batch_size
                 x_batch = input[start_idx:end_idx]
                 y_batch = y[start_idx:end_idx]
-            
+
+                # make predictions
                 predictions = self.classifier(x_batch)
                 loss = self.classifier.loss(predictions, y_batch)
                 
+                # perform optimization step
                 self.classifier.optimizer.zero_grad()
                 loss.backward()
                 self.classifier.optimizer.step()
@@ -182,7 +189,7 @@ class FFLayer(nn.Linear):
     ):
         super().__init__(in_features, out_features, bias)
         
-        self.activation_fn = activation_fn # vervangen door eigen versie?
+        self.activation_fn = activation_fn
         self.optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
         self.threshold = threshold
         self.epochs = epochs
@@ -191,7 +198,8 @@ class FFLayer(nn.Linear):
         self.to(device)
         
         self.verbose = verbose  
-        
+    
+    # get learning rate based on lr decay  
     def get_learning_rate(self, current_epoch):
         # lr(e) = 2lr/E * (1 + E - e)
         if self.lr_decay:
@@ -203,8 +211,10 @@ class FFLayer(nn.Linear):
         else:
             return self.learning_rate
         
+    # L2 normalize input vector
     def layer_normalization(self, x):
         # x_i = x_i / (sqrt(sum(x_i^2)))
+        # add small value to avoid division by zero
         return x / (torch.sqrt(torch.sum(x**2, dim=1, keepdim=True))+ 1e-08)
     
     def forward(self, x):
@@ -237,22 +247,27 @@ class FFLayer(nn.Linear):
         
         for epoch in tqdm(range(self.epochs), disable=not self.verbose):
             
+            # update lr
             if self.lr_decay:
                 lr = self.get_learning_rate(epoch + 1)
                 self.optimizer.param_groups[0]['lr'] = lr
 
             for batch in range(num_batches):
+                # get batch
                 start_idx = batch * batch_size
                 end_idx = start_idx + batch_size
                 x_pos_batch = x_pos[start_idx:end_idx]
                 x_neg_batch = x_neg[start_idx:end_idx]
                 
+                # calculate activations
                 a_pos = self.forward(x_pos_batch)
                 a_neg = self.forward(x_neg_batch)
                 
+                # calculate goodness
                 g_pos = self.calculate_goodness(a_pos)
                 g_neg = self.calculate_goodness(a_neg)
                 
+                # calculate loss
                 loss_pos = torch.log(1 + torch.exp(-(g_pos - self.threshold)))
                 loss_neg = torch.log(1 + torch.exp(g_neg - self.threshold))
                 loss = (loss_pos + loss_neg).sum()
@@ -264,7 +279,6 @@ class FFLayer(nn.Linear):
             
             if last_layer:
                 train_accuracy.append(self.calculate_accuracy(x_pos, x_neg))   
-            #print(f'epoch:{epoch+1}, avg loss: {epoch_loss / x_pos.size(0)}, lr: {self.get_learning_rate(epoch + 1)}')
             
         return self.forward(x_pos).detach(), self.forward(x_neg).detach(), train_accuracy 
         
